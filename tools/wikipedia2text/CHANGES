@@ -1,0 +1,25 @@
+This package is originally from:
+
+http://evanjones.ca/software/wikipedia2text.html
+
+I've modified it to make it suitable for extracting plaintext from an entire Wikipedia corpus.
+
+My mods are:
+
+- Included sleep.jar to run nifty Sleep scripts. You'll need Java 1.4.2+ for this interpreter to work.
+-- Added into8.sl to create 16 shell scripts (and a launch.sh) to convert article markup into XML in a way that takes advantage of multiple cores
+-- Added watchthem.sl to kill PHP processes that have run for more than two minutes
+-- Added makecorpus.sl to split plaintext file into 768 separate text files
+
+- Modified wikiextract.py to process each file in a try/catch block. This way if one file causes the process to barf, it doesn't stop
+
+See my blog for instructions on how to use this:
+
+http://blog.afterthedeadline.com/2009/12/04/generating-a-plain-text-corpus-from-wikipedia/
+
+Contact:
+
+Raphael Mudge (raffi@automattic.com)
+
+This code is released under the BSD license.
+http://www.opensource.org/licenses/bsd-license.php
