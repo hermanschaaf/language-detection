@@ -10,8 +10,8 @@ import (
 )
 
 type transition struct {
+	count       int
 	probability float64
-	target      string
 }
 
 const (
@@ -42,10 +42,10 @@ func consumeBoundary(data []byte) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-func consumeWord(data []byte) (int, []byte, error) {
+func consumeWord(data []byte, maxWordLen int) (int, []byte, error) {
 	var accum []byte
 	for i, b := range data {
-		if bytes.IndexByte(boundary, b) > -1 {
+		if bytes.IndexByte(boundary, b) > -1 || (maxWordLen > 0 && i > maxWordLen) {
 			return i, accum, nil
 		} else {
 			accum = append(accum, b)
@@ -54,7 +54,7 @@ func consumeWord(data []byte) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-func newWordReader(r io.Reader) *wordReader {
+func newWordReader(r io.Reader, maxWordLen int) *wordReader {
 	s := bufio.NewScanner(r)
 	rdr := &wordReader{
 		Scanner: s,
@@ -65,7 +65,7 @@ func newWordReader(r io.Reader) *wordReader {
 			advance, token, err = consumeBoundary(data)
 			rdr.nodeType = boundaryNode
 		} else {
-			advance, token, err = consumeWord(data)
+			advance, token, err = consumeWord(data, maxWordLen)
 			rdr.nodeType = wordNode
 		}
 		return
@@ -80,15 +80,31 @@ func parse(f string) error {
 		return err
 	}
 
-	// m := map[string]transition{}
+	m := map[string]map[string]*transition{}
 
-	s := newWordReader(file)
+	s := newWordReader(file, 2) // define max word length as 2 characters
+
+	prevTok := ""
+	total, uniques := 0, 0
 	for s.Scan() {
 		tok := s.Text()
 		if s.nodeType == wordNode {
-			fmt.Println(tok, s.nodeType)
+			total += 1
+			if _, ok := m[prevTok]; !ok {
+				m[prevTok] = map[string]*transition{}
+			}
+			if _, ok := m[prevTok][tok]; !ok {
+				m[prevTok][tok] = &transition{}
+				uniques += 1
+			}
+			m[prevTok][tok].count += 1
+			prevTok = tok
+		} else {
+			prevTok = ""
 		}
 	}
+
+	fmt.Println(total, uniques)
 
 	if err := s.Err(); err != nil {
 		log.Fatal(err)

@@ -3,5 +3,5 @@ package language
 import "testing"
 
 func TestParse(t *testing.T) {
-	parse("data/esperanto.txt")
+	parse("data/afrikaans.txt")
 }
