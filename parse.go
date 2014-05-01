@@ -7,11 +7,24 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 )
+
+type transitionMap struct {
+	transitions map[string]*transition
+	total       int
+	unique      int
+}
 
 type transition struct {
 	count       int
 	probability float64
+}
+
+func newTransitionMap() *transitionMap {
+	m := transitionMap{}
+	m.transitions = map[string]*transition{}
+	return &m
 }
 
 const (
@@ -28,7 +41,7 @@ func (w *wordReader) tokenType() int {
 	return w.nodeType
 }
 
-var boundary = []byte{' ', '\n', '\t', '\r', '.', ',', ';'}
+var boundary = []byte(" \n\t\r.!<>?,;:/(){}[]0123456789~\"*&^%$#@")
 
 func consumeBoundary(data []byte) (int, []byte, error) {
 	var accum []byte
@@ -74,40 +87,68 @@ func newWordReader(r io.Reader, maxWordLen int) *wordReader {
 	return rdr
 }
 
-func parse(f string) error {
+func parse(f string) (map[string]*transitionMap, error) {
+	m := map[string]*transitionMap{}
 	file, err := os.Open(f)
 	if err != nil {
-		return err
+		return m, err
 	}
 
-	m := map[string]map[string]*transition{}
-
-	s := newWordReader(file, 2) // define max word length as 2 characters
+	s := newWordReader(file, 5) // define max word length as 2 characters
 
 	prevTok := ""
 	total, uniques := 0, 0
 	for s.Scan() {
-		tok := s.Text()
-		if s.nodeType == wordNode {
+		tok := strings.ToLower(s.Text())
+		if s.nodeType != wordNode {
+			tok = ""
+		}
+		if s.nodeType == wordNode || prevTok != "" {
 			total += 1
 			if _, ok := m[prevTok]; !ok {
-				m[prevTok] = map[string]*transition{}
+				m[prevTok] = newTransitionMap()
 			}
-			if _, ok := m[prevTok][tok]; !ok {
-				m[prevTok][tok] = &transition{}
+			if _, ok := m[prevTok].transitions[tok]; !ok {
+				m[prevTok].transitions[tok] = &transition{}
+				m[prevTok].unique += 1
 				uniques += 1
 			}
-			m[prevTok][tok].count += 1
-			prevTok = tok
-		} else {
-			prevTok = ""
+			m[prevTok].total += 1
+			m[prevTok].transitions[tok].count += 1
 		}
+		prevTok = tok
 	}
-
 	fmt.Println(total, uniques)
 
 	if err := s.Err(); err != nil {
 		log.Fatal(err)
 	}
-	return nil
+
+	return m, nil
+}
+
+func matchString(m map[string]*transitionMap, str string) (score float64) {
+	s := newWordReader(strings.NewReader(str), 2)
+	matches := 0
+	totalWords := 0
+	totalCount := 0
+	prevTok := ""
+	for s.Scan() {
+		tok := strings.ToLower(s.Text())
+		if s.nodeType == wordNode {
+			totalWords += 1
+			if _, ok := m[prevTok]; !ok {
+				totalCount += len(m)
+			} else if _, ok := m[prevTok].transitions[tok]; !ok {
+				totalCount += m[prevTok].total
+			} else {
+				matches += m[prevTok].transitions[tok].count
+				totalCount += m[prevTok].total
+			}
+		} else {
+			prevTok = ""
+		}
+	}
+	score = float64(matches) / float64(totalCount)
+	return score
 }
